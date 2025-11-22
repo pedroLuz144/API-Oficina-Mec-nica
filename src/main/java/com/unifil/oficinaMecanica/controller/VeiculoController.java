@@ -3,6 +3,8 @@ package com.unifil.oficinaMecanica.controller;
 import com.unifil.oficinaMecanica.dto.request.VeiculoRequestDTO;
 import com.unifil.oficinaMecanica.dto.response.VeiculoResponseDTO;
 import com.unifil.oficinaMecanica.service.interfaces.VeiculoService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -13,12 +15,14 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/veiculos")
+@Tag(name = "Veículos", description = "Endpoints para gerenciamento dos veículos dos clientes")
 public class VeiculoController {
 
     @Autowired
     private VeiculoService veiculoService;
 
     @PostMapping
+    @Operation(summary = "Cadastra um novo veículo", description = "Registra um veículo e o associa a um cliente existente via CPF.")
     public ResponseEntity<?> cadastrarVeiculo(@RequestBody @Valid VeiculoRequestDTO dto) {
         try {
             veiculoService.cadastrarNovoVeiculo(dto);
@@ -29,12 +33,14 @@ public class VeiculoController {
     }
 
     @GetMapping
+    @Operation(summary = "Cadastra um novo veículo", description = "Registra um veículo e o associa a um cliente existente via CPF.")
     public ResponseEntity<List<VeiculoResponseDTO>> listarVeiculos() {
         List<VeiculoResponseDTO> veiculos = veiculoService.listarVeiculos();
         return ResponseEntity.ok(veiculos);
     }
 
     @GetMapping("/{placa}")
+    @Operation(summary = "Busca veículo por placa", description = "Retorna os detalhes de um veículo específico baseado na placa informada.")
     public ResponseEntity<?> buscarVeiculoPorPlaca(@PathVariable String placa) {
         VeiculoResponseDTO veiculo = veiculoService.buscarVeiculoPelaPlaca(placa);
 
@@ -46,6 +52,7 @@ public class VeiculoController {
     }
 
     @PutMapping("/{placa}")
+    @Operation(summary = "Atualiza dados do veículo", description = "Atualiza marca, modelo e cor de um veículo existente. A placa não pode ser alterada.")
     public ResponseEntity<?> atualizarVeiculo(@PathVariable String placa, @RequestBody @Valid VeiculoRequestDTO dto) {
         try {
             veiculoService.atualizarInformacoes(placa, dto);
@@ -56,6 +63,7 @@ public class VeiculoController {
     }
 
     @DeleteMapping("/{placa}")
+    @Operation(summary = "Remove um veículo", description = "Exclui um veículo do sistema. Falhará se houver ordens de serviço vinculadas a ele.")
     public ResponseEntity<?> removerVeiculo(@PathVariable String placa) {
         try {
             veiculoService.removerVeiculoPelaPlaca(placa);
