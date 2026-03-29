@@ -1,5 +1,6 @@
 package com.unifil.oficinaMecanica.service.implementacao;
 
+import com.unifil.oficinaMecanica.async.OrdemStatusAlteradoEvent;
 import com.unifil.oficinaMecanica.dto.request.OrdemDeServicoRequestDTO;
 import com.unifil.oficinaMecanica.dto.response.OrdemDeServicoResponseDTO;
 import com.unifil.oficinaMecanica.entity.OrdemDeServicoEntity;
@@ -10,6 +11,7 @@ import com.unifil.oficinaMecanica.repository.ServicoRepository;
 import com.unifil.oficinaMecanica.repository.VeiculoRepository;
 import com.unifil.oficinaMecanica.service.interfaces.OrdemDeServicoService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -26,6 +28,9 @@ public class OrdemDeServicoServiceImp implements OrdemDeServicoService {
 
     @Autowired
     private ServicoRepository servicoRepository;
+
+    @Autowired
+    private ApplicationEventPublisher eventPublisher;
 
     @Override
     public boolean cadastrarNovaOrdemDeServico(OrdemDeServicoRequestDTO dto) throws Exception {
@@ -87,9 +92,17 @@ public class OrdemDeServicoServiceImp implements OrdemDeServicoService {
         OrdemDeServicoEntity ordemDeServico = osOptional.get();
 
         try {
+            OrdemDeServicoEntity.Status statusAnterior = ordemDeServico.getStatus();
             OrdemDeServicoEntity.Status statusConvertido = OrdemDeServicoEntity.Status.valueOf(novoStatus.toUpperCase());
+
+            if (statusAnterior == statusConvertido) {
+                return true;
+            }
+
             ordemDeServico.setStatus(statusConvertido);
             ordemDeServicoRepository.save(ordemDeServico);
+
+            publicarEventoDeStatusAlterado(ordemDeServico, statusAnterior, statusConvertido);
             return true;
         } catch (IllegalArgumentException e) {
             throw new Exception("Status inválido: " + novoStatus + ". Os valores permitidos são: EM_ABERTO, EM_ANDAMENTO, FINALIZADA.");
@@ -107,12 +120,47 @@ public class OrdemDeServicoServiceImp implements OrdemDeServicoService {
         OrdemDeServicoEntity ordemDeServico = osOptional.get();
 
         try {
-            ordemDeServico.setStatus(com.unifil.oficinaMecanica.entity.OrdemDeServicoEntity.Status.FINALIZADA);
+            OrdemDeServicoEntity.Status statusAnterior = ordemDeServico.getStatus();
+            OrdemDeServicoEntity.Status statusNovo = OrdemDeServicoEntity.Status.FINALIZADA;
+
+            if (statusAnterior == statusNovo) {
+                return true;
+            }
+
+            ordemDeServico.setStatus(statusNovo);
             ordemDeServicoRepository.save(ordemDeServico);
+
+            publicarEventoDeStatusAlterado(ordemDeServico, statusAnterior, statusNovo);
             return true;
         } catch (Exception e) {
             throw new Exception("Ocorreu um erro ao tentar finalizar a ordem de serviço.\n" + e.getMessage());
         }
+    }
+
+    private void publicarEventoDeStatusAlterado(
+            OrdemDeServicoEntity ordemDeServico,
+            OrdemDeServicoEntity.Status statusAnterior,
+            OrdemDeServicoEntity.Status statusNovo
+    ) {
+        String nomeCliente = "cliente-desconhecido";
+        String emailCliente = "email-nao-informado";
+
+        if (ordemDeServico.getVeiculo() != null && ordemDeServico.getVeiculo().getCliente() != null) {
+            if (ordemDeServico.getVeiculo().getCliente().getNome() != null) {
+                nomeCliente = ordemDeServico.getVeiculo().getCliente().getNome();
+            }
+            if (ordemDeServico.getVeiculo().getCliente().getEmail() != null) {
+                emailCliente = ordemDeServico.getVeiculo().getCliente().getEmail();
+            }
+        }
+
+        eventPublisher.publishEvent(new OrdemStatusAlteradoEvent(
+                ordemDeServico.getId(),
+                statusAnterior,
+                statusNovo,
+                emailCliente,
+                nomeCliente
+        ));
     }
 
     @Override
