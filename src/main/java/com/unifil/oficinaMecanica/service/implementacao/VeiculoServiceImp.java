@@ -1,5 +1,6 @@
 package com.unifil.oficinaMecanica.service.implementacao;
 
+import com.unifil.oficinaMecanica.async.VeiculoValidationService;
 import com.unifil.oficinaMecanica.dto.request.VeiculoRequestDTO;
 import com.unifil.oficinaMecanica.dto.response.VeiculoResponseDTO;
 import com.unifil.oficinaMecanica.entity.ClienteEntity;
@@ -7,6 +8,8 @@ import com.unifil.oficinaMecanica.entity.VeiculoEntity;
 import com.unifil.oficinaMecanica.repository.ClienteRepository;
 import com.unifil.oficinaMecanica.repository.VeiculoRepository;
 import com.unifil.oficinaMecanica.service.interfaces.VeiculoService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -16,17 +19,29 @@ import java.util.stream.Collectors;
 
 @Service
 public class VeiculoServiceImp implements VeiculoService {
+    private static final Logger logger = LoggerFactory.getLogger(VeiculoServiceImp.class);
+
     @Autowired
     private VeiculoRepository veiculoRepository;
 
     @Autowired
     private ClienteRepository clienteRepository;
 
+    @Autowired
+    private VeiculoValidationService veiculoValidationService;
+
     @Override
     public boolean cadastrarNovoVeiculo(VeiculoRequestDTO dto) throws Exception {
+        logger.info("╔════════════════════════════════════════════════════════════════╗");
+        logger.info("║ [CADASTRO VEÍCULO] Iniciando cadastro                         ║");
+        logger.info("║ Placa: {}                                            ║", dto.placa());
+        logger.info("║ Marca/Modelo: {} {}                              ║", dto.marca(), dto.modelo());
+        logger.info("╚════════════════════════════════════════════════════════════════╝");
+
         java.util.Optional<ClienteEntity> clienteOptional = clienteRepository.findById(dto.cpfCliente());
 
         if (clienteOptional.isEmpty()) {
+            logger.error("[CADASTRO VEÍCULO] Cliente não encontrado com o CPF: {}", dto.cpfCliente());
             throw new Exception("Cliente não encontrado com o CPF: " + dto.cpfCliente());
         }
 
@@ -42,9 +57,22 @@ public class VeiculoServiceImp implements VeiculoService {
             veiculo.setCliente(cliente);
 
             veiculoRepository.save(veiculo);
+
+            logger.info("╔════════════════════════════════════════════════════════════════╗");
+            logger.info("║ [CADASTRO VEÍCULO] ✓ Veículo salvo no banco de dados         ║");
+            logger.info("║ Placa: {}                                            ║", dto.placa());
+            logger.info("║ Status: Aguardando validação assíncrona                       ║");
+            logger.info("╚════════════════════════════════════════════════════════════════╝");
+
+            veiculoValidationService.validarVeiculoAssincronamente(veiculo.getPlaca());
+
+            logger.info("[CADASTRO VEÍCULO] Validação assíncrona disparada para placa: {}", veiculo.getPlaca());
+            logger.info("[CADASTRO VEÍCULO] Retornando resposta ao cliente (operação não bloqueante)\n");
+
             return true;
 
         } catch (Exception e) {
+            logger.error("[CADASTRO VEÍCULO] Erro ao tentar cadastrar o veículo: {}", e.getMessage());
             throw new Exception("Ocorreu um erro ao tentar cadastrar o veículo.\n" + e.getMessage());
         }
     }
